@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>title</title>
+
+    <script type="module">
+      import { createParser } from 'https://unpkg.com/eventsource-parser@0.1.0/dist/index.esm.js';
+
+      async function* streamAsyncIterable(stream) {
+        const reader = stream.getReader();
+
+        try {
+          let finished = false;
+          do {
+            // eslint-disable-next-line no-await-in-loop
+            const { done, value } = await reader.read();
+            finished = done;
+            if (value) {
+              yield value;
+            }
+          } while (!finished);
+        } finally {
+          reader.releaseLock();
+        }
+      }
+
+      async function fetchSSE(input, init, onEvent) {
+        const resp = await fetch(input, init);
+
+        if (!resp.ok) {
+          const error = await resp.json().catch(() => ({}));
+          throw new Error(error ?? resp.statusText);
+        }
+
+        if (!resp.body) {
+          throw new Error('No body');
+        }
+
+        const parser = createParser((event) => {
+          onEvent(event);
+        });
+
+        for await (const chunk of streamAsyncIterable(resp.body)) {
+          const str = new TextDecoder().decode(chunk);
+          parser.feed(str);
+        }
+      }
+
+      async function startStream(funcUrl, anonKey) {
+        const abotController = new AbortController();
+
+        self.setTimeout(() => {
+          abotController.abort();
+        }, 5_000);
+
+        try {
+          await fetchSSE(
+            `${funcUrl}/sse`,
+            {
+              method: 'POST',
+              signal: abotController.signal,
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${anonKey}`,
+              },
+            },
+            (event) => {
+              if (event.type === 'event' && event.event === 'message') {
+                document.getElementById('logs').value += `${event.data}\n`;
+              }
+            },
+          );
+        } catch (error) {
+          console.log('[SSE] Error', error);
+        }
+      }
+
+      function echo(funcUrl, anonKey) {
+        return fetch(`${funcUrl}/echo`, {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${anonKey}`,
+          },
+          method: 'POST',
+          body: JSON.stringify({ text: 'Hello' }),
+        })
+          .then((r) => r.json())
+          .then((r) => {
+            console.log('[ECHO] Response', r);
+          });
+      }
+
+      function startSSE() {
+        const functionUrl = document.getElementById('function-url').value;
+        const anonKey = document.getElementById('anon-key').value;
+
+        startStream(functionUrl, anonKey);
+      }
+
+      function startEcho() {
+        const functionUrl = document.getElementById('function-url').value;
+        const anonKey = document.getElementById('anon-key').value;
+
+        echo(functionUrl, anonKey);
+      }
+
+      window.startSSE = startSSE;
+      window.startEcho = startEcho;
+    </script>
+  </head>
+  <body>
+    <div>
+      <label>
+        Supabase Function Base URL
+        <input
+          id="function-url"
+          type="text"
+          placeholder="https://asdf.functions.supabase.co"
+          value="https://qnxylkmonguvsdgttmll.functions.supabase.co"
+        />
+      </label>
+    </div>
+    <div>
+      <label>
+        Supabase Anon Key
+        <input
+          id="anon-key"
+          type="text"
+          placeholder="eyJhb..."
+          value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFueHlsa21vbmd1dnNkZ3R0bWxsIiwicm9sZSI6ImFub24iLCJpYXQiOjE2NzU4NjY5MTMsImV4cCI6MTk5MTQ0MjkxM30.ze1qai-wDY8vNmBKDtqL46rYL8He-SywN9x2lMSnF2c"
+        />
+      </label>
+    </div>
+
+    <div>
+      <button onclick="startSSE()">Start SSE</button>
+      <button onclick="startEcho()">Echo</button>
+    </div>
+
+    <div>
+      <textarea id="logs"></textarea>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "supabase-sse",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "supabase": "supabase"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "supabase": "^1.38.2"
+  }
+}
