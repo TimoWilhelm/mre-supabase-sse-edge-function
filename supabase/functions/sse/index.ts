@@ -2,13 +2,6 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import type { Handler } from 'https://deno.land/std@0.168.0/http/server.ts';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST',
-  'Access-Control-Allow-Headers':
-    'origin, x-requested-with, content-type, accept, authorization, x-client-info, apikey, content-type',
-};
-
 interface ServerSentEvent<T> {
   id: string;
   event: string;
